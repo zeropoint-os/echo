@@ -42,8 +42,8 @@ curl -X POST http://<zeropoint-node>:2370/api/modules \
 |------|------|-------------|---------|
 | `zp_module_id` | string | Unique identifier for this module instance (injected by zeropoint). | (required) |
 | `zp_network_name` | string | Pre-created docker network name (injected by zeropoint). | (required) |
-| `zp_module_path` | string | Agent's terraform working dir (injected by zeropoint). | (required) |
-| `zp_storage_path` | string | Module's isolated data root; use for all bind mounts (injected by zeropoint). | (required) |
+| `zp_module_dir` | string | Agent's terraform working dir (injected by zeropoint). | (required) |
+| `zp_storage_dir` | string | Module's isolated data root; use for all bind mounts (injected by zeropoint). | (required) |
 | `zp_arch` | string | Target architecture (injected by zeropoint). | `"amd64"` |
 | `zp_gpu_vendor` | string | GPU vendor (injected by zeropoint). | `""` |
 | `greeting` | string | Message echoed by the container on startup. | `"hello from zeropoint"` |

@@ -38,14 +38,14 @@ variable "zp_gpu_vendor" {
   description = "GPU vendor (injected by zeropoint)."
 }
 
-variable "zp_module_path" {
+variable "zp_module_dir" {
   type        = string
   description = "Agent's working directory for this module (injected by zeropoint). Terraform state and the cloned source live here. Users may edit this — the agent moves the directory atomically."
 }
 
-variable "zp_storage_path" {
+variable "zp_storage_dir" {
   type        = string
-  description = "Isolated data root for this module (injected by zeropoint). All bind mounts MUST be under this path so the agent can move user data when zp_storage_path is edited (atomic same-fs, rsync-and-swap cross-fs)."
+  description = "Isolated data root for this module (injected by zeropoint). All bind mounts MUST be under this path so the agent can move user data when zp_storage_dir is edited (atomic same-fs, rsync-and-swap cross-fs)."
 }
 
 # ---- user vars -------------------------------------------------------------
