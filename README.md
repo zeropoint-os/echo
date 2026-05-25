@@ -1,13 +1,25 @@
 # Echo zeropoint module
 
-The smallest possible module that satisfies the [zeropoint](https://github.com/zeropoint-os/zeropoint) install contract. Spins up an `alpine:3.19` container that echoes a greeting then sleeps, and exposes its inputs back through outputs so the full `var → terraform → output` pipeline can be exercised.
+A minimal-but-real test module for the [zeropoint](https://github.com/zeropoint-os/zeropoint) install contract. Spins up an `alpine:3.19` container running `busybox httpd` that serves the configured greeting as plain text on port 8080, and exposes its inputs back through outputs so the full `var → terraform → output → endpoint → envoy → mDNS` pipeline can be exercised end-to-end.
 
 Used by [zeropoint-agent](https://github.com/zeropoint-os/zeropoint-agent) as the canonical bootstrap test module — a fresh devcontainer installs echo automatically so the install path is always covered.
 
 ## Resources Created
 
 - **Docker Image**: `alpine:3.19` (kept locally)
-- **Docker Container**: alpine running `echo '<greeting>' && sleep <sleep_seconds>`
+- **Docker Container**: alpine running `busybox httpd -f -p 8080 -h /www`, with `/www/index.html` set to `<greeting>`
+
+## End-to-end test
+
+```bash
+# expose port_http via the agent
+curl -s -X POST http://localhost:2370/api/expose \
+  -H 'Content-Type: application/json' \
+  -d '{"port_var_id":"modules/echo/port_http"}'
+
+# resolve from anywhere on the LAN
+curl http://echo.local/      # → the configured greeting
+```
 
 ## Requirements
 
@@ -46,15 +58,14 @@ curl -X POST http://<zeropoint-node>:2370/api/modules \
 | `zp_storage_dir` | string | Module's isolated data root; use for all bind mounts (injected by zeropoint). | (required) |
 | `zp_arch` | string | Target architecture (injected by zeropoint). | `"amd64"` |
 | `zp_gpu_vendor` | string | GPU vendor (injected by zeropoint). | `""` |
-| `greeting` | string | Message echoed by the container on startup. | `"hello from zeropoint"` |
-| `sleep_seconds` | number | How long the container stays alive after greeting. | `86400` |
+| `greeting` | string | Message served by the container on GET /. | `"hello from zeropoint"` |
 
 ## Outputs
 
 | Name | Description |
 |------|-------------|
 | `main` | The alpine container resource. |
-| `main_ports` | Placeholder (echo has no real listener). |
+| `main_ports` | Single `http` port (8080) served by busybox httpd. |
 | `greeting_echoed` | The greeting passed back through, used to verify the user-var → output pipeline. |
 | `container_name` | The container's actual name as resolved by docker. |
 
@@ -62,7 +73,7 @@ curl -X POST http://<zeropoint-node>:2370/api/modules \
 
 - **Container Name**: `${zp_module_id}-main` (e.g. `echo-main`)
 - **Network**: pre-created by zeropoint via `zp_network_name`
-- **No Host Ports**: echo doesn't listen on anything — the `placeholder` port satisfies the contract requirement.
+- **Container port**: 8080 (http). Exposed via the agent's `port_http` Var → Endpoint → Envoy → mDNS path.
 
 ## License
 

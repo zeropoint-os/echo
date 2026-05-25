@@ -1,9 +1,17 @@
 # Echo zeropoint module
 #
-# The smallest possible module that satisfies the zeropoint install
-# contract. It runs an alpine container that echoes a greeting then
-# sleeps, exposing the inputs back through outputs so the full
-# var → terraform → output pipeline can be exercised.
+# A minimal-but-real module that satisfies the zeropoint install
+# contract end-to-end:
+#
+#   - runs an alpine container with busybox httpd serving the
+#     greeting as plain text on port 8080
+#   - declares that port through `main_ports` so the agent can
+#     expose it via an Endpoint
+#   - echoes the greeting back through outputs so the var →
+#     terraform → output pipeline can be verified
+#
+# `curl http://<endpoint-name>.local/` returns the greeting once an
+# http Endpoint has been created against `port_http`.
 
 terraform {
   required_providers {
@@ -53,13 +61,7 @@ variable "zp_storage_dir" {
 variable "greeting" {
   type        = string
   default     = "hello from zeropoint"
-  description = "Message echoed by the container on startup."
-}
-
-variable "sleep_seconds" {
-  type        = number
-  default     = 86400
-  description = "How long the container stays alive after greeting."
+  description = "Message served by the container on GET /."
 }
 
 # ---- resources -------------------------------------------------------------
@@ -69,10 +71,19 @@ resource "docker_image" "alpine" {
   keep_locally = true
 }
 
+# Write the greeting to a file inside the container's /www, then
+# run busybox httpd to serve it on :8080. Single-shot startup; no
+# language runtime, no extra packages.
 resource "docker_container" "main" {
   name    = "${var.zp_module_id}-main"
   image   = docker_image.alpine.image_id
-  command = ["sh", "-c", "echo '${var.greeting}'; sleep ${var.sleep_seconds}"]
+  command = [
+    "sh", "-c",
+    "apk add --no-cache busybox-extras >/dev/null && mkdir -p /www && printf %s \"$GREETING\" > /www/index.html && exec busybox-extras httpd -f -p 8080 -h /www",
+  ]
+  env = [
+    "GREETING=${var.greeting}",
+  ]
 
   networks_advanced {
     name = var.zp_network_name
@@ -83,21 +94,21 @@ resource "docker_container" "main" {
 
 # ---- outputs ---------------------------------------------------------------
 
-# Required by the zeropoint contract: the primary container resource.
 output "main" {
   value       = docker_container.main
   description = "Main alpine container."
 }
 
-# Required: ports declared by the main container. Echo has no real
-# listener; we declare a placeholder to satisfy the contract.
+# Ports declared by the main container. The agent's per-port sync
+# turns each entry here into a `port_<name>` Var that users can
+# expose via the picker.
 output "main_ports" {
   value = {
-    placeholder = {
-      port        = 0
-      protocol    = "tcp"
+    http = {
+      port        = 8080
+      protocol    = "http"
       transport   = "tcp"
-      description = "Placeholder (echo has no real listener)."
+      description = "Plain-text greeting served by busybox httpd."
       default     = true
     }
   }
@@ -105,7 +116,7 @@ output "main_ports" {
 }
 
 # Echoes the configured greeting back as an output so the
-# from_output VarNode pipeline can be verified end to end.
+# Var → output flow can be verified independently of HTTP.
 output "greeting_echoed" {
   value       = var.greeting
   description = "Echoes the configured greeting; verifies user var → output flow."
